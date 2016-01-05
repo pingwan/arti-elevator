@@ -5,17 +5,35 @@ init module {
 		% some floor (see also the belief section).
 		onRoute(Level, Dir) :- atFloor(Here), dir(Dir), Diff is Level-Here, (Diff<0 -> Dir=down; Dir=up).
 		
+		%check if the level of the elevator is the same as Level
+		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == up, carPosition(L), A is ceiling(L), A == Level, DistanceScore is 1.
+		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == down, carPosition(L), A is floor(L), A == Level, DistanceScore is 1.
+		
+		
+		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == up, A = 0.  
+		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == down, A = 1.  
+		onPath(Level,A) :-carPosition(L), Level > round(L), dir(Dir), Dir == up, A = 1.  
+		onPath(Level,A) :-carPosition(L), Level > round(L), dir(Dir), Dir == down, A = 0.  
+		
+		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 1, carPosition(L),floorCount(K),  Distance is abs(Level - L), DistanceScore is (1-(Distance / K)).
+		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 0, DistanceScore is 0.
+		
+		%update score based on whether there is space left or not.
 		score(Level, Dir, Score) :- spaceLeft(H), H > 0, score(Level, Dir, Score, 1, 1).
 		score(Level, Dir, Score) :- spaceLeft(H), H == 0, Score is -100.
 		
 		%update score based on whether the elevator is onroute in the corresponding direction
-		score(Level, Dir, Score, CurScore, I) :- I == 1, onRoute(Level,Dir) , CurScore is CurScore + 1, J is I + 1, score(Level, Dir, Score, CurScore, J).
-		score(Level, Dir, Score, CurScore, I) :- I == 1, not(onRoute(Level,Dir)), CurScore is CurScore - 1,J is I + 1, score(Level, Dir, Score, CurScore, J).
+		score(Level, Dir, Score, CurScore, I) :- I == 1, onRoute(Level,Dir) , NewScore is CurScore + 1, score(Level, Dir, Score, NewScore, 2).
+		score(Level, Dir, Score, CurScore, I) :- I == 1, not(onRoute(Level,Dir)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 2).
 		
 		%update score based on whether the elevator is on the current floor or not.
-		score(Level, Dir, Score, CurScore, I) :- I == 2, atFloor(Level), CurScore is CurScore + 1, I is I + 1, Score is -5000.
-		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), CurScore is CurScore - 1, I is I + 1, Score is 5000.
-		 
+		score(Level, Dir, Score, CurScore, I) :- I == 2, atFloor(Level), NewScore is CurScore + 1, score(Level, Dir, Score, NewScore, 3).
+		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 3).
+		
+		%update score based on the distance and current direction of the elevator
+		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, Score is NewScore.
+
+		
 	}
 	beliefs{
 		% The direction that will be shown to the people at the next stop.
@@ -26,6 +44,7 @@ init module {
 		doorState(unknown).
 		% Initially, there are zero people in the elevator
 		people(0).
+		carPosition(0).
 	}
 	goals{
 		atFloor(1), dir(up).
@@ -56,13 +75,15 @@ main module {
 event module {
 	program {
 		
-		% --- handle percepts that only need to be process once.
-	
+		% --- handle percepts that only need to be process once . --- %
+		
 		% set the initial capacity of the elevator and send the information to the manager.
 		if bel(percept(capacity(N))) then insert( capacity(N)) + insert(spaceLeft(0)) + (manager).send(capacity(N)).
 		
 		% set the total floor count environment and send the information to the manager.
 		if bel(percept(floorCount(N))) then insert( floorCount(N)) + (manager).send(floorCount(N)).
+		
+		forall bel( percept(carPosition(L)), not(carPosition(L)), carPosition(K) ) do delete(carPosition(K)) + insert( carPosition(L) ).
 
 		% update the amount of people in the elevator
 		forall bel( percept(people(N)), people(X), capacity(Y), Z is Y-N, spaceLeft(H)) do delete(people(X) ) + insert(people(N)) + delete(spaceLeft(H))  + insert(spaceLeft(Z)).

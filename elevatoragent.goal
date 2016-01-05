@@ -4,6 +4,18 @@ init module {
 		% Note that onRoute only succeeds when the elevator car is "docked", i.e. atFloor(Here) succeeds for
 		% some floor (see also the belief section).
 		onRoute(Level, Dir) :- atFloor(Here), dir(Dir), Diff is Level-Here, (Diff<0 -> Dir=down; Dir=up).
+		
+		score(Level, Dir, Score) :- spaceLeft(H), H > 0, score(Level, Dir, Score, 1, 1).
+		score(Level, Dir, Score) :- spaceLeft(H), H == 0, Score is -100.
+		
+		%update score based on whether the elevator is onroute in the corresponding direction
+		score(Level, Dir, Score, CurScore, I) :- I == 1, onRoute(Level,Dir) , CurScore is CurScore + 1, J is I + 1, score(Level, Dir, Score, CurScore, J).
+		score(Level, Dir, Score, CurScore, I) :- I == 1, not(onRoute(Level,Dir)), CurScore is CurScore - 1,J is I + 1, score(Level, Dir, Score, CurScore, J).
+		
+		%update score based on whether the elevator is on the current floor or not.
+		score(Level, Dir, Score, CurScore, I) :- I == 2, atFloor(Level), CurScore is CurScore + 1, I is I + 1, Score is -5000.
+		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), CurScore is CurScore - 1, I is I + 1, Score is 5000.
+		 
 	}
 	beliefs{
 		% The direction that will be shown to the people at the next stop.
@@ -43,26 +55,30 @@ main module {
 	
 event module {
 	program {
-		%%%%% Percept Processing %%%%%
-	
-		% set the initial capacity of the elevator 
-		if bel(percept(capacity(N))) then insert( capacity(N)).
 		
+		% --- handle percepts that only need to be process once.
+	
+		% set the initial capacity of the elevator and send the information to the manager.
+		if bel(percept(capacity(N))) then insert( capacity(N)) + insert(spaceLeft(0)) + (manager).send(capacity(N)).
+		
+		% set the total floor count environment and send the information to the manager.
+		if bel(percept(floorCount(N))) then insert( floorCount(N)) + (manager).send(floorCount(N)).
+
 		% update the amount of people in the elevator
-		forall bel( percept(people(N)), people(X)) do delete(people(X) ) +  insert(people(N)).
+		forall bel( percept(people(N)), people(X), capacity(Y), Z is Y-N, spaceLeft(H)) do delete(people(X) ) + insert(people(N)) + delete(spaceLeft(H))  + insert(spaceLeft(Z)).
 		
 		% The atFloor(Level) percept is received only when elevator has stopped at a floor Level.
-		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ).
-		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ).
+		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ) + (manager).send(atFloor(Level)).
+		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ) + (manager).send(not(atFloor(Level))).
 				
 		% The fButton(Level,Dir) percept indicates that the up or down (Dir) button on floor Level has been pressed.
-		forall bel( percept(fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir)) ) do insert( fButtonOn(Level,Dir) ).
-		forall bel( fButtonOn(Level,Dir), not(percept(fButtonOn(Level,Dir))) ) do delete( fButtonOn(Level,Dir) ).
+		forall bel( percept(fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir)), score(Level,Dir,Score) ) do insert( fButtonOn(Level,Dir) ) + (manager).send(fButtonOn(Level,Dir))
+		 	+ insert(score(Score)).
+		forall bel( fButtonOn(Level,Dir), not(percept(fButtonOn(Level,Dir))) ) do delete( fButtonOn(Level,Dir) ) + (manager).send(not(fButtonOn(Level,Dir))).
 		
 		% The doorState percept is received only if the door state has changed.
 		% So we do not need to check whether the New value is different from the Old value to avoid unnecessary updates.
 		forall bel( percept(doorState(New)), doorState(Old) ) do insert( not(doorState(Old)), doorState(New) ).
-
 
 		%%%%% Goal Management %%%%%
 

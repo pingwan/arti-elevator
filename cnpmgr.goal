@@ -1,0 +1,29 @@
+init module{
+	knowledge{
+	}
+	beliefs{
+	}
+	goals{
+	}
+}
+
+main module{
+	program{
+	}
+}
+
+event module{
+	program{
+		%Store capacity and remember name of agents	
+		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)).
+		
+		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
+		forall bel(received(Sender,atFloor(Level)), not(atFloor(Sender,Level))) do insert(atFloor(Sender,Level)).
+		forall bel(received(Sender,not(atFloor(Level))), atFloor(Sender,Level)) do delete(atFloor(Sender,Level)).
+		
+		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
+		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Sender,Level,Dir))) do insert(fButtonOn(Sender,Level,Dir)).
+		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Sender,Level,Dir)) do delete(fButtonOn(Sender,Level,Dir)).
+		
+	}
+}

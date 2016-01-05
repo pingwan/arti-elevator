@@ -12,10 +12,12 @@ environment {
 }
 
 agentfiles {
-	"elevatoragent.goal" [name=file1] .
+	"elevatoragent.goal" [name=elevatorfile] .
+	"cnpmgr.goal" [name=managerfile] .
 }
 
 launchpolicy {
-    when [type=car,max=3]@env do launch elevator:file1 .
+	when [type=car,max=6]@env do launch elevator:elevatorfile .
+	launch manager:managerfile .
+	
 }
-

@@ -101,12 +101,16 @@ event module {
 		% So we do not need to check whether the New value is different from the Old value to avoid unnecessary updates.
 		forall bel( percept(doorState(New)), doorState(Old) ) do insert( not(doorState(Old)), doorState(New) ).
 		
-		
-		
 		%%%%% Handle the messages from the manager %%%%%
 		
 		%calculate score if agent receives messages from the manager and if it has not sent the score yet.
-		forall bel(received(Sender,calculateScore(Level, Dir)), score(Level,Dir,Score), not(sent(manager,score(Level, Dir)))) do (manager).send(score(Level,Dir,Score)) + insert(sent(manager,score(Level,Dir))).
+		forall bel(received(Sender,calculateScore(Level, Dir)), score(Level,Dir,Score), not(sent(manager,score(Level, Dir,Score)))) do (manager).send(score(Level,Dir,Score)).
+		
+		%congratz! the agent has been given the task
+		if bel(received(manager,task(Level,Dir))) then adopt( atFloor(Level), dir(Dir) ).
+		
+		
+ 
 		
 		%%%%% Goal Management %%%%%
 
@@ -114,16 +118,21 @@ event module {
 		% and not moving.
 		
 		% Adopt new stops that are on this agent's route.
-		forall bel( fButtonOn(Level, Dir), onRoute(Level, Dir) ) do adopt( atFloor(Level), dir(Dir) ).
+		%forall bel( fButtonOn(Level, Dir), onRoute(Level, Dir) ) do adopt( atFloor(Level), dir(Dir) ).
 				
 		% The eButton(Level) percept is received when the elevator button on floor Level has been pressed.
 		% In that case, the agent will adopt a goal to service that floor. It is ASSUMED that a button for a floor is
 		% pressed that is "on route", i.e. in the direction the elevator is currently travelling.
-		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
+		%forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
 
 		% If there are no current goals to pursue, then adopt a goal to service an arbitrary floor for
 		% which a floor button has been pressed that is not already being serviced.
-		if bel( atFloor(Any) ), not(goal( atFloor(AnyL) )), bel( fButtonOn(L,D), doorState(closed) )
-			then adopt( atFloor(L), dir(D) ).
+		%if bel( atFloor(Any) ), not(goal( atFloor(AnyL) )), bel( fButtonOn(L,D), doorState(closed) )
+			%then adopt( atFloor(L), dir(D) ).
+			
+
+		%clean up the mailbox
+		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
 	}
 }

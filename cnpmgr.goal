@@ -1,11 +1,21 @@
 init module{
 	knowledge{
+		% The number of elevator
+		amountOfElevators(N) :- findall(T,agent(X),T), length(T,X), N is X - 1.
+		
+		%helper rules to get the last element.	
+		lastElement([(S,W)],X):- X is W.
+		lastElement([H|T],X) :- lastElement(T,X).
+		
+		calculateHigestScore(Level,Dir,Winner) :- Winner is elevator_1.%findall((Score, Sender),score(Sender,Level,Dir,Score),T), sort(T,Y), lastElement(Y,(_,Winner)), X is Winner.   %sort(4,@>=,T,[(Winner,_,_,_)|_]).
+		 
 	}
 	beliefs{
 	}
 	goals{
 	}
 }
+
 
 main module{
 	program{
@@ -31,14 +41,22 @@ event module{
 		
 		%Handle the incoming scores from the elevators
 		forall bel(received(Sender, score(Level,Dir,Score))) do insert(score(Sender,Level,Dir,Score)).
+		forall bel(findall(T,score(Sender,Level,Dir,Score),T), length(T,X)) do insert(amountOfScores(Level,Dir,X)).
 		
 		%Check if we received a score from all the elevators  // CURRENT HARDCODED 3 agents
-		if bel(score(Sender,Level,Dir,Score), findall([Level,Dir],score(Sender,Level,Dir,_),T), T >= 3) then {
+		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,X),amountOfElevators(Y), X < 10 ) then {
 			%check its score of each agent
+				
+			if bel(calculateHigestScore(Level,Dir,Winner)) then (Winner).send(task(Level,Dir))  + insert(assigned(Level,Dir)).
+			
+			% Clean-up after the task is assigned to elevator
+			forall bel(score(Sender,Level,Dir,Score)) do delete(score(Sender,Level,Dir,Score)).
+	
 		}
 		
-		
-		
-		
+		%clean up the mailbox
+		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
+	
 	}
 }

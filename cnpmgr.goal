@@ -15,15 +15,30 @@ main module{
 event module{
 	program{
 		%Store capacity and remember name of agents	
-		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)).
+		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)). 
+		% raar als ik tijdens de debug in de belief kijk van de manger slaat hij soms de "agent(Sender)" niet op :\
 		
 		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
 		forall bel(received(Sender,atFloor(Level)), not(atFloor(Sender,Level))) do insert(atFloor(Sender,Level)).
 		forall bel(received(Sender,not(atFloor(Level))), atFloor(Sender,Level)) do delete(atFloor(Sender,Level)).
 		
-		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
-		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Sender,Level,Dir))) do insert(fButtonOn(Sender,Level,Dir)).
-		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Sender,Level,Dir)) do delete(fButtonOn(Sender,Level,Dir)).
+		%Store or delete each fButton presses
+		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) + insert(not(assigned(Level,Dir))).
+		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
+		
+		%Let's check for fButton presses that are not assigned to an elevator
+		forall bel(fButtonOn(Level,Dir), agent(X), not(me(X)), not(sent(X, calculateScore(Level, Dir)))) do (X).send(calculateScore(Level, Dir)) + insert(sent(X, calculateScore(Level, Dir))).
+		
+		%Handle the incoming scores from the elevators
+		forall bel(received(Sender, score(Level,Dir,Score))) do insert(score(Sender,Level,Dir,Score)).
+		
+		%Check if we received a score from all the elevators  // CURRENT HARDCODED 3 agents
+		if bel(score(Sender,Level,Dir,Score), findall([Level,Dir],score(Sender,Level,Dir,_),T), T >= 3) then {
+			%check its score of each agent
+		}
+		
+		
+		
 		
 	}
 }

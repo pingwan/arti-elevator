@@ -100,7 +100,14 @@ event module {
 		% The doorState percept is received only if the door state has changed.
 		% So we do not need to check whether the New value is different from the Old value to avoid unnecessary updates.
 		forall bel( percept(doorState(New)), doorState(Old) ) do insert( not(doorState(Old)), doorState(New) ).
-
+		
+		
+		
+		%%%%% Handle the messages from the manager %%%%%
+		
+		%calculate score if agent receives messages from the manager and if it has not sent the score yet.
+		forall bel(received(Sender,calculateScore(Level, Dir)), score(Level,Dir,Score), not(sent(manager,score(Level, Dir)))) do (manager).send(score(Level,Dir,Score)) + insert(sent(manager,score(Level,Dir))).
+		
 		%%%%% Goal Management %%%%%
 
 		% The elevator agent changes its plans only while it is docked, i.e., at a floor

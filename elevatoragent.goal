@@ -31,7 +31,11 @@ init module {
 		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 3).
 		
 		%update score based on the distance and current direction of the elevator
-		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, Score is NewScore.
+		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, score(Level, Dir, Score, NewScore, 4).
+		
+		%update score wheather the elevator is idle or not
+		score(Level, Dir, Score, CurScore, I) :- I == 4, moving , NewScore is CurScore + 10000, Score is NewScore.
+		score(Level, Dir, Score, CurScore, I) :- I == 4, not(moving) , NewScore is CurScore + 0, Score is NewScore.
 
 		
 	}
@@ -89,8 +93,8 @@ event module {
 		forall bel( percept(people(N)), people(X), capacity(Y), Z is Y-N, spaceLeft(H)) do delete(people(X) ) + insert(people(N)) + delete(spaceLeft(H))  + insert(spaceLeft(Z)).
 		
 		% The atFloor(Level) percept is received only when elevator has stopped at a floor Level.
-		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ) + (manager).send(atFloor(Level)).
-		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ) + (manager).send(not(atFloor(Level))).
+		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ) + delete(moving)  +(manager).send(atFloor(Level)).
+		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ) + insert(moving) +(manager).send(not(atFloor(Level))).
 				
 		% The fButton(Level,Dir) percept indicates that the up or down (Dir) button on floor Level has been pressed.
 		forall bel( percept(fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir)), score(Level,Dir,Score) ) do insert( fButtonOn(Level,Dir) ) + (manager).send(fButtonOn(Level,Dir))
@@ -101,6 +105,8 @@ event module {
 		% So we do not need to check whether the New value is different from the Old value to avoid unnecessary updates.
 		forall bel( percept(doorState(New)), doorState(Old) ) do insert( not(doorState(Old)), doorState(New) ).
 		
+		%idle checking
+	
 		%%%%% Handle the messages from the manager %%%%%
 		
 		%calculate score if agent receives messages from the manager and if it has not sent the score yet.
@@ -108,9 +114,6 @@ event module {
 		
 		%congratz! the agent has been given the task
 		if bel(received(manager,task(Level,Dir))) then adopt( atFloor(Level), dir(Dir) ).
-		
-		
- 
 		
 		%%%%% Goal Management %%%%%
 
@@ -123,7 +126,7 @@ event module {
 		% The eButton(Level) percept is received when the elevator button on floor Level has been pressed.
 		% In that case, the agent will adopt a goal to service that floor. It is ASSUMED that a button for a floor is
 		% pressed that is "on route", i.e. in the direction the elevator is currently travelling.
-		%forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
+		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
 
 		% If there are no current goals to pursue, then adopt a goal to service an arbitrary floor for
 		% which a floor button has been pressed that is not already being serviced.
@@ -132,7 +135,7 @@ event module {
 			
 
 		%clean up the mailbox
-		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
-		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
+		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
 	}
 }

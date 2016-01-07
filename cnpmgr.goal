@@ -1,13 +1,16 @@
 init module{
 	knowledge{
 		% The number of elevator
-		amountOfElevators(N) :- findall(T,agent(X),T), length(T,X), N is X - 1.
+	
+		amountOfElevators(N) :- findall(A, agent(A), L), length(L,X), N is X - 1.
 		
 		%helper rules to get the last element.	
-		lastElement([(S,W)],X):- X is W.
-		lastElement([H|T],X) :- lastElement(T,X).
+		%lastElement([(S,W)],X):- X is W.
+		%lastElement([H|T],X) :- lastElement(T,X).
 		
-		calculateHigestScore(Level,Dir,Winner) :- Winner is elevator_1.%findall((Score, Sender),score(Sender,Level,Dir,Score),T), sort(T,Y), lastElement(Y,(_,Winner)), X is Winner.   %sort(4,@>=,T,[(Winner,_,_,_)|_]).
+		calculateHigestScore(Level,Dir,Winner) :- Winner is elevator_0.%findall((Score, Sender),score(Sender,Level,Dir,Score),T), sort(T,Y), lastElement(Y,(_,Winner)), X is Winner.   %sort(4,@>=,T,[(Winner,_,_,_)|_]).
+		 
+		%amountOfUniqueMessages(Level,Dir,X) :-  findall(T,score(_,Level,Dir,_),T), length(T,Y), X is Y. 
 		 
 	}
 	beliefs{
@@ -33,7 +36,7 @@ event module{
 		forall bel(received(Sender,not(atFloor(Level))), atFloor(Sender,Level)) do delete(atFloor(Sender,Level)).
 		
 		%Store or delete each fButton presses
-		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) + insert(not(assigned(Level,Dir))).
+		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) + insert(not(assigned(Level,Dir))) +  insert(amountOfScores(Level, Dir, 0)).
 		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
 		
 		%Let's check for fButton presses that are not assigned to an elevator
@@ -41,22 +44,26 @@ event module{
 		
 		%Handle the incoming scores from the elevators
 		forall bel(received(Sender, score(Level,Dir,Score))) do insert(score(Sender,Level,Dir,Score)).
-		forall bel(findall(T,score(Sender,Level,Dir,Score),T), length(T,X)) do insert(amountOfScores(Level,Dir,X)).
+		
+		forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
 		
 		%Check if we received a score from all the elevators  // CURRENT HARDCODED 3 agents
-		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,X),amountOfElevators(Y), X < 10 ) then {
+		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{
 			%check its score of each agent
 				
-			if bel(calculateHigestScore(Level,Dir,Winner)) then (Winner).send(task(Level,Dir))  + insert(assigned(Level,Dir)).
+			%if bel(calculateHigestScore(Level,Dir,Winner), Winner == elevator_0) then (Winner).send(task(Level,Dir))  + insert(assigned(Level,Dir)).
 			
+			
+			if bel(score(Sender, Level, Dir, Score)), not(bel(score(Sender1, Level, Dir, Score2), Score2 > Score)) then (Sender).send(task(Level,Dir)) + insert(assigned(Level, Dir)).
+	
 			% Clean-up after the task is assigned to elevator
 			forall bel(score(Sender,Level,Dir,Score)) do delete(score(Sender,Level,Dir,Score)).
 	
 		}
 		
 		%clean up the mailbox
-		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
-		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
+		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
 	
 	}
 }

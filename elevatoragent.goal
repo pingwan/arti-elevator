@@ -1,5 +1,6 @@
 init module {
 	knowledge{
+			
 		% onRoute succeeds when Level is in the current direction Dir relative to the floor the agent is at.
 		% Note that onRoute only succeeds when the elevator car is "docked", i.e. atFloor(Here) succeeds for
 		% some floor (see also the belief section).
@@ -9,7 +10,6 @@ init module {
 		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == up, carPosition(L), A is ceiling(L), A == Level, DistanceScore is 1.
 		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == down, carPosition(L), A is floor(L), A == Level, DistanceScore is 1.
 		
-		
 		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == up, A = 0.  
 		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == down, A = 1.  
 		onPath(Level,A) :-carPosition(L), Level > round(L), dir(Dir), Dir == up, A = 1.  
@@ -17,6 +17,8 @@ init module {
 		
 		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 1, carPosition(L),floorCount(K),  Distance is abs(Level - L), DistanceScore is (1-(Distance / K)).
 		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 0, DistanceScore is 0.
+		
+		
 		
 		%update score based on whether there is space left or not.
 		score(Level, Dir, Score) :- spaceLeft(H), H > 0, score(Level, Dir, Score, 1, 1).
@@ -31,13 +33,10 @@ init module {
 		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 3).
 		
 		%update score based on the distance and current direction of the elevator
-		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, score(Level, Dir, Score, NewScore, 4).
+		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, score(Level,Dir,Score,NewScore,4).
 		
-		%update score wheather the elevator is idle or not
-		score(Level, Dir, Score, CurScore, I) :- I == 4, moving , NewScore is CurScore + 10000, Score is NewScore.
-		score(Level, Dir, Score, CurScore, I) :- I == 4, not(moving) , NewScore is CurScore + 0, Score is NewScore.
-
-		
+		score(Level, Dir, Score, CurScore, I) :- I == 4, idle, NewScore is CurScore + 10, Score is NewScore.
+		score(Level, Dir, Score, CurScore, I) :- I == 4, not(idle), NewScore is CurScore + 0, Score is NewScore.
 	}
 	beliefs{
 		% The direction that will be shown to the people at the next stop.
@@ -49,6 +48,7 @@ init module {
 		% Initially, there are zero people in the elevator
 		people(0).
 		carPosition(0).
+		idle.
 	}
 	goals{
 		atFloor(1), dir(up).
@@ -113,7 +113,14 @@ event module {
 		forall bel(received(Sender,calculateScore(Level, Dir)), score(Level,Dir,Score), not(sent(manager,score(Level, Dir,Score)))) do (manager).send(score(Level,Dir,Score)).
 		
 		%congratz! the agent has been given the task
-		if bel(received(manager,task(Level,Dir))) then adopt( atFloor(Level), dir(Dir) ).
+		if bel(received(manager,task(Level,Dir))) then insert(task(Level,Dir)) + adopt( atFloor(Level), dir(Dir) ).
+		
+		%let's check if the elevator arrived at a floor
+		%if this is the case and it was one of the goal, let the manager know the task has been completed
+		if bel(task(Y,Dir)), not(goal(atFloor(Y),dir(Dir))) then (manager).send(taskCompleted(Y,Dir)).
+		
+		if goal(atFloor(X),dir(Dir)), bel(idle) then delete(idle).
+		if not(goal(atFloor(X),dir(Dir))), bel(not(idle)) then insert(idle).
 		
 		%%%%% Goal Management %%%%%
 
@@ -127,13 +134,13 @@ event module {
 		% In that case, the agent will adopt a goal to service that floor. It is ASSUMED that a button for a floor is
 		% pressed that is "on route", i.e. in the direction the elevator is currently travelling.
 		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
+		
 
 		% If there are no current goals to pursue, then adopt a goal to service an arbitrary floor for
 		% which a floor button has been pressed that is not already being serviced.
 		%if bel( atFloor(Any) ), not(goal( atFloor(AnyL) )), bel( fButtonOn(L,D), doorState(closed) )
 			%then adopt( atFloor(L), dir(D) ).
 			
-
 		%clean up the mailbox
 		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
 		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).

@@ -1,24 +1,13 @@
 init module{
 	knowledge{
-		% The number of elevator
-	
+		%Calculate the amount of elevators
 		amountOfElevators(N) :- findall(A, agent(A), L), length(L,X), N is X - 1.
-		
-		%helper rules to get the last element.	
-		%lastElement([(S,W)],X):- X is W.
-		%lastElement([H|T],X) :- lastElement(T,X).
-		
-		calculateHigestScore(Level,Dir,Winner) :- Winner is elevator_0.%findall((Score, Sender),score(Sender,Level,Dir,Score),T), sort(T,Y), lastElement(Y,(_,Winner)), X is Winner.   %sort(4,@>=,T,[(Winner,_,_,_)|_]).
-		 
-		%amountOfUniqueMessages(Level,Dir,X) :-  findall(T,score(_,Level,Dir,_),T), length(T,Y), X is Y. 
-		 
 	}
 	beliefs{
 	}
 	goals{
 	}
 }
-
 
 main module{
 	program{
@@ -29,7 +18,6 @@ event module{
 	program{
 		%Store capacity and remember name of agents	
 		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)). 
-		% raar als ik tijdens de debug in de belief kijk van de manger slaat hij soms de "agent(Sender)" niet op :\
 		
 		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
 		forall bel(received(Sender,atFloor(Level)), not(atFloor(Sender,Level))) do insert(atFloor(Sender,Level)).
@@ -40,30 +28,33 @@ event module{
 		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
 		
 		%Let's check for fButton presses that are not assigned to an elevator
-		forall bel(fButtonOn(Level,Dir), agent(X), not(me(X)), not(sent(X, calculateScore(Level, Dir)))) do (X).send(calculateScore(Level, Dir)) + insert(sent(X, calculateScore(Level, Dir))).
+		forall bel(fButtonOn(Level,Dir), agent(X), not(me(X)), not(sent(X, calculateScore(Level, Dir))), not(assigned(Level,Dir))) do (X).send(calculateScore(Level, Dir)).
 		
 		%Handle the incoming scores from the elevators
-		forall bel(received(Sender, score(Level,Dir,Score))) do insert(score(Sender,Level,Dir,Score)).
+		forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), score(Sender,Level,Dir,OldScore)) do insert(score(Sender,Level,Dir,Score)) + delete(score(Sender,Level,Dir,OldScore)).
+		forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), not(score(Sender,Level,Dir,OldScore))) do insert(score(Sender,Level,Dir,Score)).
 		
 		forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
 		
-		%Check if we received a score from all the elevators  // CURRENT HARDCODED 3 agents
+		%Check if we received a score from all the elevators
 		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{
 			%check its score of each agent
 				
-			%if bel(calculateHigestScore(Level,Dir,Winner), Winner == elevator_0) then (Winner).send(task(Level,Dir))  + insert(assigned(Level,Dir)).
-			
-			
 			if bel(score(Sender, Level, Dir, Score)), not(bel(score(Sender1, Level, Dir, Score2), Score2 > Score)) then (Sender).send(task(Level,Dir)) + insert(assigned(Level, Dir)).
 	
 			% Clean-up after the task is assigned to elevator
+			forall bel(amountOfScores(Level,Dir,X)) do delete(amountOfScores(Level,Dir,X)). 
 			forall bel(score(Sender,Level,Dir,Score)) do delete(score(Sender,Level,Dir,Score)).
-	
 		}
 		
+		
+		
+		%Handle the messages from agent that notify that has completed their task
+		forall bel(received(Sender, taskCompleted(Y,Dir)), assigned(Y,Dir)) do delete(assigned(Y,Dir)).
+		
 		%clean up the mailbox
-		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
-		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
-	
+		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
+		
 	}
 }

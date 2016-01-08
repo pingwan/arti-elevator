@@ -15,16 +15,10 @@ main module{
 }
 
 event module{
-	program{
-		%Store capacity and remember name of agents	
-		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)). 
-		
-		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
-		forall bel(received(Sender,atFloor(Level)), not(atFloor(Sender,Level))) do insert(atFloor(Sender,Level)).
-		forall bel(received(Sender,not(atFloor(Level))), atFloor(Sender,Level)) do delete(atFloor(Sender,Level)).
-		
+	program{		
 		%Store or delete each fButton presses
-		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) + insert(not(assigned(Level,Dir))) +  insert(amountOfScores(Level, Dir, 0)).
+		%forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) + insert(not(assigned(Level,Dir))) +  insert(amountOfScores(Level, Dir, 0)).
+		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) +  insert(amountOfScores(Level, Dir, 0)).
 		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
 		
 		%Let's check for fButton presses that are not assigned to an elevator
@@ -37,7 +31,7 @@ event module{
 		forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
 		
 		%Check if we received a score from all the elevators
-		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{
+		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y >= X ) then{
 			%check its score of each agent
 				
 			if bel(score(Sender, Level, Dir, Score)), not(bel(score(Sender1, Level, Dir, Score2), Score2 > Score)) then (Sender).send(task(Level,Dir)) + insert(assigned(Level, Dir)).
@@ -54,7 +48,7 @@ event module{
 		
 		%clean up the mailbox
 		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
-		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
+		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
 		
 	}
 }

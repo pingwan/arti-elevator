@@ -117,7 +117,7 @@ event module {
 		
 		%let's check if the elevator arrived at a floor
 		%if this is the case and it was one of the goal, let the manager know the task has been completed
-		if bel(task(Y,Dir)), not(goal(atFloor(Y),dir(Dir))) then (manager).send(taskCompleted(Y,Dir)).
+		if bel(task(Y,Dir)), not(goal(atFloor(Y),dir(Dir))) then delete(task(Y,Dir)) + (manager).send(taskCompleted(Y,Dir)).
 		
 		if goal(atFloor(X),dir(Dir)), bel(idle) then delete(idle).
 		if not(goal(atFloor(X),dir(Dir))), bel(not(idle)) then insert(idle).

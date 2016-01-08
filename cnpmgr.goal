@@ -36,7 +36,7 @@ event module{
 		}
 		
 		% Handle the messages from agent that notify that has completed their task
-		forall bel(received(Sender, taskCompleted(Y,Dir)), assigned(Y,Dir)) do delete(assigned(Y,Dir)) + allother.send(completed(Y,Dir)).
+		forall bel(received(Sender, taskCompleted(Y,Dir)), assigned(Y,Dir), agent(X), not(me(X))) do delete(assigned(Y,Dir)) + (X).send(completed(Y,Dir)).
 		
 		% Clean up the received and sent messages in the mailbox
 		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).

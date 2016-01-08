@@ -18,8 +18,6 @@ init module {
 		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 1, carPosition(L),floorCount(K),  Distance is abs(Level - L), DistanceScore is (1-(Distance / K)).
 		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 0, DistanceScore is 0.
 		
-		
-		
 		%update score based on whether there is space left or not.
 		score(Level, Dir, Score) :- spaceLeft(H), H > 0, score(Level, Dir, Score, 1, 1).
 		score(Level, Dir, Score) :- spaceLeft(H), H == 0, Score is -100.
@@ -28,12 +26,8 @@ init module {
 		score(Level, Dir, Score, CurScore, I) :- I == 1, onRoute(Level,Dir) , NewScore is CurScore + 1, score(Level, Dir, Score, NewScore, 2).
 		score(Level, Dir, Score, CurScore, I) :- I == 1, not(onRoute(Level,Dir)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 2).
 		
-		%update score based on whether the elevator is on the current floor or not.
-		score(Level, Dir, Score, CurScore, I) :- I == 2, atFloor(Level), NewScore is CurScore + 1, score(Level, Dir, Score, NewScore, 3).
-		score(Level, Dir, Score, CurScore, I) :- I == 2, not(atFloor(Level)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 3).
-		
 		%update score based on the distance and current direction of the elevator
-		score(Level, Dir, Score, CurScore, I) :- I == 3, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, Score is NewScore.
+		score(Level, Dir, Score, CurScore, I) :- I == 2, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, Score is NewScore.
 	}
 	beliefs{
 		% The direction that will be shown to the people at the next stop.
@@ -75,55 +69,57 @@ main module {
 	
 event module {
 	program {
+		% Set initial percepts into belief base
+		%%%%
 		
+		% Set the initial capacity of the elevator and send the information to the manager.
+		if bel( percept(capacity(N)) ) then insert( capacity(N) ) + insert( spaceLeft(0) ).
 		
-		% --- handle percepts that only need to be process once . --- %
-		
-		% set the initial capacity of the elevator and send the information to the manager.
-		if bel(percept(capacity(N))) then insert( capacity(N)) + insert(spaceLeft(0)) + (manager).send(capacity(N)).
-		
-		% set the total floor count environment and send the information to the manager.
-		if bel(percept(floorCount(N))) then insert( floorCount(N)) + (manager).send(floorCount(N)).
-		
-		forall bel( percept(carPosition(L)), not(carPosition(L)), carPosition(K) ) do delete(carPosition(K)) + insert( carPosition(L) ).
+		% Updates the current Position of the Car
+		forall bel( percept(carPosition(L)), not(carPosition(L)), carPosition(K) ) do delete( carPosition(K) ) + insert( carPosition(L) ).
 
-		% update the amount of people in the elevator
-		forall bel( percept(people(N)), people(X), capacity(Y), Z is Y-N, spaceLeft(H)) do delete(people(X) ) + insert(people(N)) + delete(spaceLeft(H))  + insert(spaceLeft(Z)).
+		% Update the amount of people currently in the elevator
+		forall bel( percept(people(N)), people(X), capacity(Y), Z is Y-N, spaceLeft(H) ) do delete(people(X) ) + insert(people(N)) + delete(spaceLeft(H))  + insert(spaceLeft(Z)).
 		
 		% The atFloor(Level) percept is received only when elevator has stopped at a floor Level.
-		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ) + delete(moving)  +(manager).send(atFloor(Level)).
-		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ) + insert(moving) +(manager).send(not(atFloor(Level))).
+		forall bel( percept(atFloor(Level)), not(atFloor(Level)) ) do insert( atFloor(Level) ).
+		forall bel( atFloor(Level), not(percept(atFloor(Level))) ) do delete( atFloor(Level) ).
 				
+		% Send messages to the manager to inform about the amount of floor and which Floor Buttons are on
+		%%%%
+				
+		% Set the total floor count environment and send the information to the manager.
+		if bel( percept(floorCount(N)) ) then insert( floorCount(N) ) + (manager).send(floorCount(N)).
+		
 		% The fButton(Level,Dir) percept indicates that the up or down (Dir) button on floor Level has been pressed.
-		forall bel( percept(fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir)), score(Level,Dir,Score) ) do insert( fButtonOn(Level,Dir) ) + (manager).send(fButtonOn(Level,Dir))
-		 	+ insert(score(Score)).
+		forall bel( percept(fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir)), score(Level,Dir,Score) ) do insert( fButtonOn(Level,Dir) ) + (manager).send(fButtonOn(Level,Dir)).
 		forall bel( fButtonOn(Level,Dir), not(percept(fButtonOn(Level,Dir))) ) do delete( fButtonOn(Level,Dir) ) + (manager).send(not(fButtonOn(Level,Dir))).
 		
-		%check if idle
+		% Check States of the elevator
+		%%%%
+		
+		% Check if the Elevator is Idle
 		if bel(atFloor(X), idle(Y), Z is Y + 1) then insert(idle(Z)) + delete(idle(Y)).
 		if bel(not(atFloor(X)), idle(Y), Y > 0) then insert(idle(0)) + delete(idle(Y)).
-		
+		% Go to a Floor where the button has been pressed if no floors are assigned and elevator is still Idle
 		if bel(idle(Y), fButtonOn(Level,Dir), Y >= 200 ) then adopt( atFloor(Level), dir(Dir) ) + insert(idle(0)) + delete(idle(Y)). 
 		
-		% The doorState percept is received only if the door state has changed.
-		% So we do not need to check whether the New value is different from the Old value to avoid unnecessary updates.
+		% Checks the current state of the door and updates it accordingly
 		forall bel( percept(doorState(New)), doorState(Old) ) do insert( not(doorState(Old)), doorState(New) ).
-		
-		%idle checking
 	
-		%%%%% Handle the messages from the manager %%%%%
+		% Receive and send messages from/to the Manager
+		%%%%
 		
-		%calculate score if agent receives messages from the manager and if it has not sent the score yet.
+		% Calculate score if agent receives messages from the manager and if it has not sent the score yet for the Floor and Direction.
 		forall bel(received(Sender,calculateScore(Level, Dir)), score(Level,Dir,Score) , not(sent(manager,score(Level, Dir,Score)))) do (manager).send(score(Level,Dir,Score)).
 		
-		%congratz! the agent has been given the task
+		% Receive message that the elevators score was the highest and insert the task and adopts the Floor and Direction into his goals
 		if bel(received(manager,task(Level,Dir))) then insert(task(Level,Dir)) + adopt( atFloor(Level), dir(Dir) ).
 		
-		%let's check if the elevator arrived at a floor
-		%if this is the case and it was one of the goal, let the manager know the task has been completed
+		% If a task has been completed inform the manager that it has been completed 
 		forall bel(task(Y,Dir)), not(goal(atFloor(Y),dir(Dir))) do (manager).send(taskCompleted(Y,Dir)).
-		
-		forall bel(received(manager,completed(Level,Dir))), goal(atFloor(Level), dir(Dir)) do drop(atFloor(Level), dir(Dir)).
+		% If a task is completed by someone else stop doing this goal unless it's a goal from an eButton
+		forall bel(received(manager,completed(Level,Dir)), not(eButtonOn(Level, Dir))), goal(atFloor(Level), dir(Dir)) do drop(atFloor(Level), dir(Dir)).
 		
 		%%%%% Goal Management %%%%%
 
@@ -136,7 +132,8 @@ event module {
 		% The eButton(Level) percept is received when the elevator button on floor Level has been pressed.
 		% In that case, the agent will adopt a goal to service that floor. It is ASSUMED that a button for a floor is
 		% pressed that is "on route", i.e. in the direction the elevator is currently travelling.
-		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do adopt( atFloor(Level), dir(Dir) ).
+		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do insert( eButtonOn(Level, Dir) ) + adopt( atFloor(Level), dir(Dir) ).
+		forall bel( eButtonOn(Level,Dir), not(percept(eButtonOn(Level))) ) do delete( eButtonOn(Level,Dir) ).
 		
 
 		% If there are no current goals to pursue, then adopt a goal to service an arbitrary floor for

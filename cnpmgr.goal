@@ -19,10 +19,6 @@ event module{
 		%Store capacity and remember name of agents	
 		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)). 
 		
-		%Store and update the 'atFloor' message of each agent, then we know if a agent is moving or not	
-		forall bel(received(Sender,atFloor(Level)), not(atFloor(Sender,Level))) do insert(atFloor(Sender,Level)).
-		forall bel(received(Sender,not(atFloor(Level))), atFloor(Sender,Level)) do delete(atFloor(Sender,Level)).
-		
 		%Store or delete each fButton presses
 		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) +  insert(amountOfScores(Level, Dir, 0)).
 		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
@@ -34,9 +30,9 @@ event module{
 		%forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), score(Sender,Level,Dir,OldScore)) do insert(score(Sender,Level,Dir,Score)) + delete(score(Sender,Level,Dir,OldScore)).
 		%forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), not(score(Sender,Level,Dir,OldScore))) do insert(score(Sender,Level,Dir,Score)).
 		
-		  %Handle the incoming scores from the elevators
-  forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), amountOfScores(Level, Dir, CurScore), NewScore is CurScore + 1) do 
-   insert(score(Sender,Level,Dir,Score)) + delete(amountOfScores(Level, Dir, CurScore)) + insert(amountOfScores(Level, Dir, NewScore)).
+		%Handle the incoming scores from the elevators
+  		forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), amountOfScores(Level, Dir, CurScore), NewScore is CurScore + 1) do 
+   			insert(score(Sender,Level,Dir,Score)) + delete(amountOfScores(Level, Dir, CurScore)) + insert(amountOfScores(Level, Dir, NewScore)).
 			
 		%forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
 		

@@ -6,27 +6,29 @@ init module {
 		% some floor (see also the belief section).
 		onRoute(Level, Dir) :- atFloor(Here), dir(Dir), Diff is Level-Here, (Diff<0 -> Dir=down; Dir=up).
 		
-		%check if the level of the elevator is the same as Level
+		% Check if the level of the elevator is the same as Level of the requested task
 		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == up, carPosition(L), A is ceiling(L), A == Level, DistanceScore is 1.
 		distanceScore(Level, DistanceScore) :- dir(Dir), Dir == down, carPosition(L), A is floor(L), A == Level, DistanceScore is 1.
 		
-		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == up, A = 0.  
-		onPath(Level,A) :-carPosition(L), Level < round(L), dir(Dir), Dir == down, A = 1.  
-		onPath(Level,A) :-carPosition(L), Level > round(L), dir(Dir), Dir == up, A = 1.  
-		onPath(Level,A) :-carPosition(L), Level > round(L), dir(Dir), Dir == down, A = 0.  
+		% Look if the level is in the direction the elevator is currently going
+		onPath(Level,A) :- carPosition(L), Level < round(L), dir(Dir), Dir == up, A = 0.  
+		onPath(Level,A) :- carPosition(L), Level < round(L), dir(Dir), Dir == down, A = 1.  
+		onPath(Level,A) :- carPosition(L), Level > round(L), dir(Dir), Dir == up, A = 1.  
+		onPath(Level,A) :- carPosition(L), Level > round(L), dir(Dir), Dir == down, A = 0.  
 		
-		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 1, carPosition(L),floorCount(K),  Distance is abs(Level - L), DistanceScore is (1-(Distance / K)).
+		% Check if the tasks level is in the direction the elevator is going if so then calculate the distance to this floor if not on it's current path return 0
+		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 1, carPosition(L), floorCount(K),  Distance is abs(Level - L), DistanceScore is (1-(Distance / K)).
 		distanceScore(Level, DistanceScore) :- onPath(Level,A), A == 0, DistanceScore is 0.
 		
-		%update score based on whether there is space left or not.
+		% Update score based on whether there is space left or not.
 		score(Level, Dir, Score) :- spaceLeft(H), H > 0, score(Level, Dir, Score, 1, 1).
 		score(Level, Dir, Score) :- spaceLeft(H), H == 0, Score is -100.
 		
-		%update score based on whether the elevator is onroute in the corresponding direction
+		% Update score based on whether the elevator is onroute in the corresponding direction
 		score(Level, Dir, Score, CurScore, I) :- I == 1, onRoute(Level,Dir) , NewScore is CurScore + 1, score(Level, Dir, Score, NewScore, 2).
 		score(Level, Dir, Score, CurScore, I) :- I == 1, not(onRoute(Level,Dir)), NewScore is CurScore - 1, score(Level, Dir, Score, NewScore, 2).
 		
-		%update score based on the distance and current direction of the elevator
+		% Update score based on the distance and current direction of the elevator
 		score(Level, Dir, Score, CurScore, I) :- I == 2, distanceScore(Level,DistanceScore), NewScore is CurScore + DistanceScore, Score is NewScore.
 	}
 	beliefs{
@@ -38,7 +40,9 @@ init module {
 		doorState(unknown).
 		% Initially, there are zero people in the elevator
 		people(0).
+		% The starting Position of the cars (is irrelevant since it get's updated immediatly)
 		carPosition(0).
+		% Keeps track how long an elevator isn't doing anything
 		idle(0).
 	}
 	goals{
@@ -120,28 +124,12 @@ event module {
 		forall bel(task(Y,Dir)), not(goal(atFloor(Y),dir(Dir))) do (manager).send(taskCompleted(Y,Dir)).
 		% If a task is completed by someone else stop doing this goal unless it's a goal from an eButton
 		forall bel(received(manager,completed(Level,Dir)), not(eButtonOn(Level, Dir))), goal(atFloor(Level), dir(Dir)) do drop(atFloor(Level), dir(Dir)).
-		
-		%%%%% Goal Management %%%%%
-
-		% The elevator agent changes its plans only while it is docked, i.e., at a floor
-		% and not moving.
-		
-		% Adopt new stops that are on this agent's route.
-		%forall bel( fButtonOn(Level, Dir), onRoute(Level, Dir) ) do adopt( atFloor(Level), dir(Dir) ).
 				
-		% The eButton(Level) percept is received when the elevator button on floor Level has been pressed.
-		% In that case, the agent will adopt a goal to service that floor. It is ASSUMED that a button for a floor is
-		% pressed that is "on route", i.e. in the direction the elevator is currently travelling.
+		% The eButton(Level) percept is received when the elevator button on floor Level has been pressed
 		forall bel( percept(eButtonOn(Level)), dir(Dir) ) do insert( eButtonOn(Level, Dir) ) + adopt( atFloor(Level), dir(Dir) ).
 		forall bel( eButtonOn(Level,Dir), not(percept(eButtonOn(Level))) ) do delete( eButtonOn(Level,Dir) ).
-		
-
-		% If there are no current goals to pursue, then adopt a goal to service an arbitrary floor for
-		% which a floor button has been pressed that is not already being serviced.
-		%if bel( atFloor(Any) ), not(goal( atFloor(AnyL) )), bel( fButtonOn(L,D), doorState(closed) )
-			%then adopt( atFloor(L), dir(D) ).
 			
-		%clean up the mailbox
+		% Clean up the received and sent messages in the mailbox
 		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
 		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
 	}

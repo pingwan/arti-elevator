@@ -1,6 +1,6 @@
 init module{
 	knowledge{
-		%Calculate the amount of elevators
+		% Calculate the amount of elevators
 		amountOfElevators(N) :- findall(A, agent(A), L), length(L,X), N is X - 1.
 	}
 	beliefs{
@@ -16,47 +16,30 @@ main module{
 
 event module{
 	program{
-		%Store capacity and remember name of agents	
-		forall bel(received(Sender,capacity(N))) do insert(capacity(Sender,N)) + insert(agent(Sender)). 
-		
-		%Store or delete each fButton presses
+		% Receive all fButtonOn messages and store or delete each fButton press
 		forall bel(received(Sender,fButtonOn(Level,Dir)), not(fButtonOn(Level,Dir))) do insert(fButtonOn(Level,Dir)) +  insert(amountOfScores(Level, Dir, 0)).
 		forall bel(received(Sender,not(fButtonOn(Level,Dir))), fButtonOn(Level,Dir)) do delete(fButtonOn(Level,Dir)).
 		
-		%Let's check for fButton presses that are not assigned to an elevator
-		forall bel(fButtonOn(Level,Dir), agent(X), not(me(X)), not(sent(X, calculateScore(Level, Dir))), not(assigned(Level,Dir))) do (X).send(calculateScore(Level, Dir)).
+		% Let's check for fButton presses that are not assigned to an elevator and send request for scores from the elevators
+		forall bel(fButtonOn(Level,Dir), not(assigned(Level,Dir))) do allother.send(calculateScore(Level, Dir)).
 		
-		%Handle the incoming scores from the elevators
-		%forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), score(Sender,Level,Dir,OldScore)) do insert(score(Sender,Level,Dir,Score)) + delete(score(Sender,Level,Dir,OldScore)).
-		%forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), not(score(Sender,Level,Dir,OldScore))) do insert(score(Sender,Level,Dir,Score)).
-		
-		%Handle the incoming scores from the elevators
+		% Handle the incoming scores from the elevators and insert those that are not yet assigned and update the amount of scores received 
   		forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), amountOfScores(Level, Dir, CurScore), NewScore is CurScore + 1) do 
    			insert(score(Sender,Level,Dir,Score)) + delete(amountOfScores(Level, Dir, CurScore)) + insert(amountOfScores(Level, Dir, NewScore)).
-			
-		%forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
-		
 	
-		%Check if we received a score from all the elevators
-		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{
-			%check its score of each agent
-				
+		% Check if we received a score from all the elevators
+		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{				
 			if bel(score(Sender, Level, Dir, Score)), not(bel(score(Sender1, Level, Dir, Score2), Score2 > Score)) then (Sender).send(task(Level,Dir)) +insert(assigned(Level, Dir)).
-	
-			% Clean-up after the task is assigned to elevator
+			% Remove all the inserted scores and the amount of scores received for a given fButton with the respective Level and Dir 
 			forall bel(amountOfScores(Level,Dir,X),assigned(Level,Dir)) do delete(amountOfScores(Level,Dir,X)). 
 			forall bel(score(Sender,Level,Dir,Score), assigned(Level,Dir)) do delete(score(Sender,Level,Dir,Score)).
 		}
 		
-		forall bel(assigned(Level,Dir), agent(X), not(me(X))) do (X).send(processed(Level,Dir)). 
+		% Handle the messages from agent that notify that has completed their task
+		forall bel(received(Sender, taskCompleted(Y,Dir)), assigned(Y,Dir)) do delete(assigned(Y,Dir)) + allother.send(completed(Y,Dir)).
 		
-		
-		%Handle the messages from agent that notify that has completed their task
-		forall bel(received(Sender, taskCompleted(Y,Dir)), assigned(Y,Dir), agent(X), not(me(X))) do delete(assigned(Y,Dir)) + (X).send(completed(Y,Dir)).
-		
-		%clean up the mailbox
-		%forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
-		%forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).
-		
+		% Clean up the received and sent messages in the mailbox
+		forall bel(received(Agent, Message)) do delete(received(Agent, Message)).
+		forall bel(sent(Agent, Message)) do delete(sent(Agent, Message)).	
 	}
 }

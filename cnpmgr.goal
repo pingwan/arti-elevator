@@ -37,15 +37,10 @@ event module{
 		  %Handle the incoming scores from the elevators
   forall bel(received(Sender, score(Level,Dir,Score)), not(assigned(Level,Dir)), amountOfScores(Level, Dir, CurScore), NewScore is CurScore + 1) do 
    insert(score(Sender,Level,Dir,Score)) + delete(amountOfScores(Level, Dir, CurScore)) + insert(amountOfScores(Level, Dir, NewScore)).
-		
-		
-		
-		
+			
 		%forall bel(score(Sender,Level, Dir, Score), amountOfScores(Level, Dir, X), Y is X + 1) do delete(amountOfScores(Level, Dir, X)) + insert(amountOfScores(Level, Dir, Y)).
 		
-		
-		
-		
+	
 		%Check if we received a score from all the elevators
 		if bel(score(Sender,Level,Dir,Score), amountOfScores(Level,Dir,Y), not(assigned(Level, Dir)) , amountOfElevators(X), Y == X ) then{
 			%check its score of each agent
